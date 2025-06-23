@@ -5,9 +5,12 @@ const ClockInOut: React.FC = () => {
   const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
   const today = new Date().toISOString().split('T')[0];
 
+  // Load attendance from localStorage for real-time sync
+  const getAttendanceArr = () => JSON.parse(localStorage.getItem('mockAttendance') || '[]');
+
   // Find today's attendance for the current user
-  const initialAttendance = mockAttendance.find(
-    (a) => a.userId === currentUser.id && a.date === today
+  const initialAttendance = getAttendanceArr().find(
+    (a: any) => a.userId === currentUser.id && a.date === today
   );
 
   const [clockInTime, setClockInTime] = useState<string>(initialAttendance?.clockIn || '');
@@ -15,38 +18,36 @@ const ClockInOut: React.FC = () => {
 
   // Update attendance in localStorage (simulate backend)
   const updateAttendance = (clockIn?: string, clockOut?: string) => {
+    let arr = getAttendanceArr();
     let updated = false;
-    for (let att of mockAttendance) {
+    arr = arr.map((att: any) => {
       if (att.userId === currentUser.id && att.date === today) {
         if (clockIn) att.clockIn = clockIn;
         if (clockOut) att.clockOut = clockOut;
         updated = true;
       }
+      return att;
+    });
+    if (!updated) {
+      arr.push({
+        id: Date.now().toString(),
+        userId: currentUser.id,
+        date: today,
+        status: clockIn ? 'present' : 'absent',
+        clockIn: clockIn || '',
+        clockOut: clockOut || '',
+      });
     }
-if (!updated) {
-  mockAttendance.push({
-    id: Date.now().toString(), // Convert to string
-    userId: currentUser.id,
-    date: today,
-    status: clockIn ? 'present' : 'absent',
-    clockIn: clockIn || '',
-    clockOut: clockOut || '',
-  });
-}
-    // Optionally, persist to localStorage for demo
-    localStorage.setItem('mockAttendance', JSON.stringify(mockAttendance));
+    localStorage.setItem('mockAttendance', JSON.stringify(arr));
   };
 
   useEffect(() => {
     // Load from localStorage if available
-    const stored = localStorage.getItem('mockAttendance');
-    if (stored) {
-      const arr = JSON.parse(stored);
-      const att = arr.find((a: any) => a.userId === currentUser.id && a.date === today);
-      if (att) {
-        setClockInTime(att.clockIn || '');
-        setClockOutTime(att.clockOut || '');
-      }
+    const arr = getAttendanceArr();
+    const att = arr.find((a: any) => a.userId === currentUser.id && a.date === today);
+    if (att) {
+      setClockInTime(att.clockIn || '');
+      setClockOutTime(att.clockOut || '');
     }
   }, [currentUser.id, today]);
 
