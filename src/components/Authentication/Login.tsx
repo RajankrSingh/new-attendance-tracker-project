@@ -14,7 +14,7 @@ const Login: React.FC = () => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
-  const { signIn, signUp } = useAuth();
+  const { signIn, signUp, user, profile } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -55,11 +55,10 @@ const Login: React.FC = () => {
 
   // Navigate based on user role when authenticated
   React.useEffect(() => {
-    const { user, profile } = useAuth();
     if (user && profile) {
       navigate(profile.role === 'admin' ? '/admin' : '/dashboard');
     }
-  }, [navigate]);
+  }, [navigate, user, profile]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-100 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
