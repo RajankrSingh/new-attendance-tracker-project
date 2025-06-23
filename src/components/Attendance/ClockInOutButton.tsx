@@ -1,93 +1,157 @@
 import React, { useState, useEffect } from 'react';
-import { mockAttendance } from '../../data/mockData';
+import { Clock, CheckCircle, XCircle } from 'lucide-react';
+import { useAuth } from '../../hooks/useAuth';
+import { useAttendance } from '../../hooks/useAttendance';
 
 const ClockInOut: React.FC = () => {
-  const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
-  const today = new Date().toISOString().split('T')[0];
-
-  // Load attendance from localStorage for real-time sync
-  const getAttendanceArr = () => JSON.parse(localStorage.getItem('mockAttendance') || '[]');
-
-  // Find today's attendance for the current user
-  const initialAttendance = getAttendanceArr().find(
-    (a: any) => a.userId === currentUser.id && a.date === today
-  );
-
-  const [clockInTime, setClockInTime] = useState<string>(initialAttendance?.clockIn || '');
-  const [clockOutTime, setClockOutTime] = useState<string>(initialAttendance?.clockOut || '');
-
-  // Update attendance in localStorage (simulate backend)
-  const updateAttendance = (clockIn?: string, clockOut?: string) => {
-    let arr = getAttendanceArr();
-    let updated = false;
-    arr = arr.map((att: any) => {
-      if (att.userId === currentUser.id && att.date === today) {
-        if (clockIn) att.clockIn = clockIn;
-        if (clockOut) att.clockOut = clockOut;
-        updated = true;
-      }
-      return att;
-    });
-    if (!updated) {
-      arr.push({
-        id: Date.now().toString(),
-        userId: currentUser.id,
-        date: today,
-        status: clockIn ? 'present' : 'absent',
-        clockIn: clockIn || '',
-        clockOut: clockOut || '',
-      });
-    }
-    localStorage.setItem('mockAttendance', JSON.stringify(arr));
-  };
+  const { user } = useAuth();
+  const { clockIn, clockOut, getTodayAttendance, loading } = useAttendance(user?.id);
+  const [currentTime, setCurrentTime] = useState(new Date());
+  const [actionLoading, setActionLoading] = useState(false);
 
   useEffect(() => {
-    // Load from localStorage if available
-    const arr = getAttendanceArr();
-    const att = arr.find((a: any) => a.userId === currentUser.id && a.date === today);
-    if (att) {
-      setClockInTime(att.clockIn || '');
-      setClockOutTime(att.clockOut || '');
+    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const todayAttendance = user ? getTodayAttendance(user.id) : null;
+
+  const handleClockIn = async () => {
+    if (!user) return;
+    
+    setActionLoading(true);
+    try {
+      const { error } = await clockIn(user.id);
+      if (error) {
+        alert('Error clocking in. Please try again.');
+      }
+    } catch (error) {
+      alert('Error clocking in. Please try again.');
+    } finally {
+      setActionLoading(false);
     }
-  }, [currentUser.id, today]);
-
-  const handleClockIn = () => {
-    const now = new Date().toLocaleTimeString();
-    setClockInTime(now);
-    updateAttendance(now, undefined);
   };
 
-  const handleClockOut = () => {
-    const now = new Date().toLocaleTimeString();
-    setClockOutTime(now);
-    updateAttendance(undefined, now);
+  const handleClockOut = async () => {
+    if (!user) return;
+    
+    setActionLoading(true);
+    try {
+      const { error } = await clockOut(user.id);
+      if (error) {
+        alert('Error clocking out. Please try again.');
+      }
+    } catch (error) {
+      alert('Error clocking out. Please try again.');
+    } finally {
+      setActionLoading(false);
+    }
   };
+
+  if (loading) {
+    return (
+      <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md mx-auto">
+        <div className="animate-pulse">
+          <div className="h-6 bg-gray-200 rounded mb-4"></div>
+          <div className="h-10 bg-gray-200 rounded mb-4"></div>
+          <div className="h-10 bg-gray-200 rounded"></div>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="bg-white rounded-lg shadow p-6 max-w-md mx-auto mt-8">
-      <h2 className="text-xl font-bold mb-4">Clock In / Clock Out</h2>
-      <div className="mb-4">
+    <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md mx-auto border border-gray-100">
+      <div className="text-center mb-6">
+        <Clock className="h-12 w-12 text-indigo-500 mx-auto mb-4" />
+        <h2 className="text-2xl font-bold text-gray-900 mb-2">Time Tracking</h2>
+        <div className="text-3xl font-mono text-indigo-600 font-bold">
+          {currentTime.toLocaleTimeString()}
+        </div>
+        <div className="text-sm text-gray-500 mt-1">
+          {currentTime.toLocaleDateString('en-US', {
+            weekday: 'long',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+          })}
+        </div>
+      </div>
+
+      <div className="space-y-4 mb-6">
         <button
           onClick={handleClockIn}
-          className="bg-green-500 text-white px-4 py-2 rounded mr-2"
-          disabled={!!clockInTime}
+          disabled={!!todayAttendance?.clock_in || actionLoading}
+          className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
         >
-          Clock In
+          {actionLoading ? (
+            <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+          ) : (
+            <>
+              <CheckCircle className="w-5 h-5" />
+              Clock In
+            </>
+          )}
         </button>
+
         <button
           onClick={handleClockOut}
-          className="bg-blue-500 text-white px-4 py-2 rounded"
-          disabled={!clockInTime || !!clockOutTime}
+          disabled={!todayAttendance?.clock_in || !!todayAttendance?.clock_out || actionLoading}
+          className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
         >
-          Clock Out
+          {actionLoading ? (
+            <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+          ) : (
+            <>
+              <XCircle className="w-5 h-5" />
+              Clock Out
+            </>
+          )}
         </button>
       </div>
-      <div>
-        <div>
-          <span className="font-medium">Clock In Time:</span> {clockInTime || '-'}
+
+      <div className="bg-gray-50 rounded-xl p-4 space-y-3">
+        <h3 className="font-semibold text-gray-900 text-center mb-3">Today's Status</h3>
+        
+        <div className="flex justify-between items-center">
+          <span className="text-sm font-medium text-gray-600">Status:</span>
+          <span
+            className={`px-3 py-1 rounded-full text-xs font-semibold ${
+              todayAttendance?.status === 'present'
+                ? 'bg-green-100 text-green-800'
+                : todayAttendance?.status === 'late'
+                ? 'bg-yellow-100 text-yellow-800'
+                : 'bg-red-100 text-red-800'
+            }`}
+          >
+            {todayAttendance?.status || 'Not clocked in'}
+          </span>
         </div>
-        <div>
-          <span className="font-medium">Clock Out Time:</span> {clockOutTime || '-'}
+
+        <div className="flex justify-between items-center">
+          <span className="text-sm font-medium text-gray-600">Clock In:</span>
+          <span className="text-sm font-mono text-gray-900">
+            {todayAttendance?.clock_in ? 
+              new Date(`2000-01-01T${todayAttendance.clock_in}`).toLocaleTimeString('en-US', {
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: true
+              }) : '-'
+            }
+          </span>
+        </div>
+
+        <div className="flex justify-between items-center">
+          <span className="text-sm font-medium text-gray-600">Clock Out:</span>
+          <span className="text-sm font-mono text-gray-900">
+            {todayAttendance?.clock_out ? 
+              new Date(`2000-01-01T${todayAttendance.clock_out}`).toLocaleTimeString('en-US', {
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: true
+              }) : '-'
+            }
+          </span>
         </div>
       </div>
     </div>
