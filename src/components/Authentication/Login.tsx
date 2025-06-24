@@ -34,20 +34,29 @@ const Login: React.FC = () => {
           setError(error.message);
         } else {
           setError('');
-          alert('Account created successfully! Please check your email to verify your account.');
+          alert('Account created successfully! Please check your email to verify your account before signing in.');
           setIsSignUp(false);
         }
       } else {
         const { error } = await signIn(email, password);
 
         if (error) {
-          setError(error.message);
+          // Provide more specific error messages for common issues
+          if (error.message.includes('Invalid login credentials')) {
+            setError('Invalid email or password. Please check your credentials and ensure your email is verified if you recently signed up.');
+          } else if (error.message.includes('Email not confirmed')) {
+            setError('Please check your email and click the verification link before signing in.');
+          } else if (error.message.includes('Too many requests')) {
+            setError('Too many login attempts. Please wait a few minutes before trying again.');
+          } else {
+            setError(error.message);
+          }
         } else {
           // Navigation will be handled by the auth state change
         }
       }
     } catch (err) {
-      setError('An unexpected error occurred');
+      setError('An unexpected error occurred. Please try again.');
     } finally {
       setLoading(false);
     }
