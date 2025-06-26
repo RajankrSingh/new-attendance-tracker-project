@@ -32,6 +32,7 @@ export function useAuth() {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('Auth state changed:', event, session?.user?.email);
       setUser(session?.user ?? null);
       if (session?.user) {
         await fetchProfile(session.user.id);
@@ -54,12 +55,26 @@ export function useAuth() {
 
       if (error) {
         console.error('Error fetching profile:', error);
+        // If profile doesn't exist, it might be still being created by the trigger
+        // Wait a bit and try again
+        setTimeout(async () => {
+          const { data: retryData, error: retryError } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', userId)
+            .single();
+          
+          if (!retryError && retryData) {
+            setProfile(retryData);
+          }
+          setLoading(false);
+        }, 1000);
       } else {
         setProfile(data);
+        setLoading(false);
       }
     } catch (error) {
       console.error('Error fetching profile:', error);
-    } finally {
       setLoading(false);
     }
   };
@@ -78,13 +93,28 @@ export function useAuth() {
     department?: string;
     position?: string;
   }) => {
+    // Sign up with email confirmation disabled for development
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
-        data: userData,
+        data: {
+          name: userData.name,
+          role: userData.role || 'user',
+          department: userData.department || '',
+          position: userData.position || '',
+        },
+        emailRedirectTo: undefined, // Disable email confirmation for now
       },
     });
+
+    if (error) {
+      console.error('Signup error:', error);
+      return { data, error };
+    }
+
+    // If signup successful, the trigger should create the profile
+    console.log('Signup successful:', data);
     return { data, error };
   };
 

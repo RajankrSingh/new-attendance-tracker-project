@@ -13,6 +13,7 @@ const Login: React.FC = () => {
   const [isSignUp, setIsSignUp] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState('');
   const navigate = useNavigate();
   const { signIn, signUp, user, profile } = useAuth();
 
@@ -20,10 +21,11 @@ const Login: React.FC = () => {
     e.preventDefault();
     setLoading(true);
     setError('');
+    setSuccess('');
 
     try {
       if (isSignUp) {
-        const { error } = await signUp(email, password, {
+        const { data, error } = await signUp(email, password, {
           name,
           role,
           department,
@@ -31,19 +33,28 @@ const Login: React.FC = () => {
         });
 
         if (error) {
-          setError(error.message);
+          console.error('Signup error:', error);
+          if (error.message.includes('User already registered')) {
+            setError('An account with this email already exists. Please sign in instead.');
+          } else {
+            setError(error.message);
+          }
         } else {
-          setError('');
-          alert('Account created successfully! Please check your email to verify your account before signing in.');
+          console.log('Signup successful:', data);
+          setSuccess('Account created successfully! You can now sign in.');
           setIsSignUp(false);
+          // Clear form
+          setEmail('');
+          setPassword('');
+          setName('');
         }
       } else {
-        const { error } = await signIn(email, password);
+        const { data, error } = await signIn(email, password);
 
         if (error) {
-          // Provide more specific error messages for common issues
+          console.error('Signin error:', error);
           if (error.message.includes('Invalid login credentials')) {
-            setError('Invalid email or password. Please check your credentials and ensure your email is verified if you recently signed up.');
+            setError('Invalid email or password. Please check your credentials.');
           } else if (error.message.includes('Email not confirmed')) {
             setError('Please check your email and click the verification link before signing in.');
           } else if (error.message.includes('Too many requests')) {
@@ -52,10 +63,12 @@ const Login: React.FC = () => {
             setError(error.message);
           }
         } else {
+          console.log('Signin successful:', data);
           // Navigation will be handled by the auth state change
         }
       }
     } catch (err) {
+      console.error('Unexpected error:', err);
       setError('An unexpected error occurred. Please try again.');
     } finally {
       setLoading(false);
@@ -65,6 +78,7 @@ const Login: React.FC = () => {
   // Navigate based on user role when authenticated
   React.useEffect(() => {
     if (user && profile) {
+      console.log('Navigating user:', user.email, 'with role:', profile.role);
       navigate(profile.role === 'admin' ? '/admin' : '/dashboard');
     }
   }, [navigate, user, profile]);
@@ -95,6 +109,12 @@ const Login: React.FC = () => {
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg relative" role="alert">
               <span className="block sm:inline">{error}</span>
+            </div>
+          )}
+
+          {success && (
+            <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg relative" role="alert">
+              <span className="block sm:inline">{success}</span>
             </div>
           )}
           
@@ -199,8 +219,9 @@ const Login: React.FC = () => {
                 type="password"
                 autoComplete={isSignUp ? "new-password" : "current-password"}
                 required
+                minLength={6}
                 className="appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
-                placeholder="Password"
+                placeholder="Password (minimum 6 characters)"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
               />
@@ -239,6 +260,7 @@ const Login: React.FC = () => {
               onClick={() => {
                 setIsSignUp(!isSignUp);
                 setError('');
+                setSuccess('');
               }}
               className="text-indigo-600 hover:text-indigo-500 text-sm font-medium"
             >
