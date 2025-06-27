@@ -23,6 +23,13 @@ const Login: React.FC = () => {
     setError('');
     setSuccess('');
 
+    // Basic validation
+    if (password.length < 6) {
+      setError('Password must be at least 6 characters long.');
+      setLoading(false);
+      return;
+    }
+
     try {
       if (isSignUp) {
         const { data, error } = await signUp(email, password, {
@@ -38,12 +45,14 @@ const Login: React.FC = () => {
             setError('An account with this email already exists. Please sign in instead.');
           } else if (error.message.includes('Password should be at least 6 characters')) {
             setError('Password must be at least 6 characters long.');
+          } else if (error.message.includes('Invalid email')) {
+            setError('Please enter a valid email address.');
           } else {
             setError(error.message);
           }
         } else {
           console.log('Signup successful:', data);
-          setSuccess('Account created successfully! You can now sign in.');
+          setSuccess('Account created successfully! You can now sign in with your credentials.');
           setIsSignUp(false);
           // Clear form
           setEmail('');
@@ -85,11 +94,15 @@ const Login: React.FC = () => {
       const { error } = await signInWithGoogle();
       if (error) {
         console.error('Google sign in error:', error);
-        setError('Failed to sign in with Google. Please try again.');
+        if (error.message.includes('provider is not enabled')) {
+          setError('Google login is not enabled. Please contact the administrator or use email/password login.');
+        } else {
+          setError('Failed to sign in with Google. Please try again or use email/password login.');
+        }
       }
     } catch (err) {
       console.error('Google sign in error:', err);
-      setError('Failed to sign in with Google. Please try again.');
+      setError('Failed to sign in with Google. Please try again or use email/password login.');
     } finally {
       setLoading(false);
     }
@@ -138,7 +151,7 @@ const Login: React.FC = () => {
             </div>
           )}
 
-          {/* Google Sign In Button */}
+          {/* Google Sign In Button - Only show for sign in */}
           {!isSignUp && (
             <div>
               <button
@@ -326,6 +339,19 @@ const Login: React.FC = () => {
             </button>
           </div>
         </form>
+
+        {/* Help text for email verification */}
+        {!isSignUp && (
+          <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+            <h4 className="text-sm font-medium text-blue-800 mb-2">Having trouble signing in?</h4>
+            <ul className="text-xs text-blue-700 space-y-1">
+              <li>• Make sure you're using the correct email and password</li>
+              <li>• If you just signed up, you can sign in immediately</li>
+              <li>• Try refreshing the page if you're having issues</li>
+              <li>• Contact support if problems persist</li>
+            </ul>
+          </div>
+        )}
       </div>
     </div>
   );
