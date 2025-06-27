@@ -47,6 +47,7 @@ export function useAuth() {
 
   const fetchProfile = async (userId: string) => {
     try {
+      setLoading(true);
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
@@ -55,8 +56,7 @@ export function useAuth() {
 
       if (error) {
         console.error('Error fetching profile:', error);
-        // If profile doesn't exist, it might be still being created by the trigger
-        // Wait a bit and try again
+        // If profile doesn't exist, wait a bit for the trigger to create it
         setTimeout(async () => {
           const { data: retryData, error: retryError } = await supabase
             .from('profiles')
@@ -66,9 +66,11 @@ export function useAuth() {
           
           if (!retryError && retryData) {
             setProfile(retryData);
+          } else {
+            console.error('Profile still not found after retry:', retryError);
           }
           setLoading(false);
-        }, 1000);
+        }, 2000);
       } else {
         setProfile(data);
         setLoading(false);
@@ -87,13 +89,22 @@ export function useAuth() {
     return { data, error };
   };
 
+  const signInWithGoogle = async () => {
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: `${window.location.origin}`,
+      },
+    });
+    return { data, error };
+  };
+
   const signUp = async (email: string, password: string, userData: {
     name: string;
     role?: 'admin' | 'user';
     department?: string;
     position?: string;
   }) => {
-    // Sign up with email confirmation disabled for development
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
@@ -101,10 +112,9 @@ export function useAuth() {
         data: {
           name: userData.name,
           role: userData.role || 'user',
-          department: userData.department || '',
-          position: userData.position || '',
+          department: userData.department || 'General',
+          position: userData.position || 'Employee',
         },
-        emailRedirectTo: undefined, // Disable email confirmation for now
       },
     });
 
@@ -113,7 +123,6 @@ export function useAuth() {
       return { data, error };
     }
 
-    // If signup successful, the trigger should create the profile
     console.log('Signup successful:', data);
     return { data, error };
   };
@@ -128,6 +137,7 @@ export function useAuth() {
     profile,
     loading,
     signIn,
+    signInWithGoogle,
     signUp,
     signOut,
   };
