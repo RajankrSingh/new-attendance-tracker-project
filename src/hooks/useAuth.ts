@@ -94,7 +94,35 @@ export function useAuth() {
       provider: 'google',
       options: {
         redirectTo: `${window.location.origin}`,
+        queryParams: {
+          access_type: 'offline',
+          prompt: 'consent',
+        },
       },
+    });
+    return { data, error };
+  };
+
+  const signInWithOTP = async (phone: string) => {
+    const { data, error } = await supabase.auth.signInWithOtp({
+      phone,
+      options: {
+        data: {
+          name: 'Mobile User',
+          role: 'user',
+          department: 'General',
+          position: 'Employee',
+        },
+      },
+    });
+    return { data, error };
+  };
+
+  const verifyOTP = async (phone: string, token: string) => {
+    const { data, error } = await supabase.auth.verifyOtp({
+      phone,
+      token,
+      type: 'sms',
     });
     return { data, error };
   };
@@ -138,6 +166,8 @@ export function useAuth() {
     loading,
     signIn,
     signInWithGoogle,
+    signInWithOTP,
+    verifyOTP,
     signUp,
     signOut,
   };
