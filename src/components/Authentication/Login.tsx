@@ -106,12 +106,13 @@ const Login: React.FC = () => {
               error.message.includes('Unsupported phone provider') ||
               error.message.includes('SMS provider not configured')) {
             setPhoneProviderDisabled(true);
-            setError('Phone authentication is not available. SMS service is not configured by the administrator. Please use email login instead.');
+            setError('Phone authentication is currently unavailable. The SMS service has not been configured by the administrator. Please use email login instead.');
             // Auto-switch to email mode after showing error
             setTimeout(() => {
               setAuthMode('email');
               setError('');
-            }, 3000);
+              setPhoneProviderDisabled(false);
+            }, 4000);
           } else if (error.message.includes('Invalid phone number')) {
             setError('Please enter a valid phone number with country code (e.g., +1234567890).');
           } else if (error.message.includes('Rate limit exceeded')) {
@@ -127,13 +128,15 @@ const Login: React.FC = () => {
         console.error('OTP send error:', err);
         
         // Handle network or other unexpected errors
-        if (err.message && err.message.includes('phone_provider_disabled')) {
+        if (err.message && (err.message.includes('phone_provider_disabled') || 
+            err.message.includes('Unsupported phone provider'))) {
           setPhoneProviderDisabled(true);
-          setError('Phone authentication is not available. SMS service is not configured by the administrator. Please use email login instead.');
+          setError('Phone authentication is currently unavailable. The SMS service has not been configured by the administrator. Please use email login instead.');
           setTimeout(() => {
             setAuthMode('email');
             setError('');
-          }, 3000);
+            setPhoneProviderDisabled(false);
+          }, 4000);
         } else {
           setError('Failed to send OTP. Please check your internet connection and try again, or use email login.');
         }
