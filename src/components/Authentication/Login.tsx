@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LogIn, UserPlus, Smartphone, Mail } from 'lucide-react';
+import { LogIn, UserPlus, Smartphone, Mail, AlertCircle } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 
 type AuthMode = 'email' | 'phone' | 'signup';
@@ -19,6 +19,7 @@ const Login: React.FC = () => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
+  const [phoneProviderDisabled, setPhoneProviderDisabled] = useState(false);
   const navigate = useNavigate();
   const { signIn, signInWithGoogle, signInWithOTP, verifyOTP, signUp, user, profile } = useAuth();
 
@@ -99,10 +100,22 @@ const Login: React.FC = () => {
         const { error } = await signInWithOTP(phone);
         if (error) {
           console.error('OTP send error:', error);
-          if (error.message.includes('SMS provider not configured')) {
-            setError('SMS service is not configured. Please contact the administrator or use email login.');
+          
+          // Handle specific phone provider errors
+          if (error.message.includes('phone_provider_disabled') || 
+              error.message.includes('Unsupported phone provider') ||
+              error.message.includes('SMS provider not configured')) {
+            setPhoneProviderDisabled(true);
+            setError('Phone authentication is not available. SMS service is not configured by the administrator. Please use email login instead.');
+            // Auto-switch to email mode after showing error
+            setTimeout(() => {
+              setAuthMode('email');
+              setError('');
+            }, 3000);
           } else if (error.message.includes('Invalid phone number')) {
             setError('Please enter a valid phone number with country code (e.g., +1234567890).');
+          } else if (error.message.includes('Rate limit exceeded')) {
+            setError('Too many OTP requests. Please wait a few minutes before trying again.');
           } else {
             setError('Failed to send OTP. Please try again or use email login.');
           }
@@ -110,9 +123,20 @@ const Login: React.FC = () => {
           setOtpSent(true);
           setSuccess('OTP sent to your phone number. Please enter the code below.');
         }
-      } catch (err) {
+      } catch (err: any) {
         console.error('OTP send error:', err);
-        setError('Failed to send OTP. Please try again or use email login.');
+        
+        // Handle network or other unexpected errors
+        if (err.message && err.message.includes('phone_provider_disabled')) {
+          setPhoneProviderDisabled(true);
+          setError('Phone authentication is not available. SMS service is not configured by the administrator. Please use email login instead.');
+          setTimeout(() => {
+            setAuthMode('email');
+            setError('');
+          }, 3000);
+        } else {
+          setError('Failed to send OTP. Please check your internet connection and try again, or use email login.');
+        }
       }
     } else {
       // Verify OTP
@@ -124,6 +148,8 @@ const Login: React.FC = () => {
             setError('Invalid OTP code. Please check and try again.');
           } else if (error.message.includes('Token has expired')) {
             setError('OTP code has expired. Please request a new one.');
+            setOtpSent(false);
+            setOtp('');
           } else {
             setError('Failed to verify OTP. Please try again.');
           }
@@ -216,6 +242,7 @@ const Login: React.FC = () => {
                 setAuthMode('email');
                 setError('');
                 setSuccess('');
+                setPhoneProviderDisabled(false);
               }}
               className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-md text-sm font-medium transition-all ${
                 authMode === 'email' || authMode === 'signup'
@@ -229,19 +256,39 @@ const Login: React.FC = () => {
             <button
               type="button"
               onClick={() => {
-                setAuthMode('phone');
-                setError('');
-                setSuccess('');
+                if (!phoneProviderDisabled) {
+                  setAuthMode('phone');
+                  setError('');
+                  setSuccess('');
+                }
               }}
+              disabled={phoneProviderDisabled}
               className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-md text-sm font-medium transition-all ${
                 authMode === 'phone'
                   ? 'bg-white text-indigo-600 shadow-sm'
+                  : phoneProviderDisabled
+                  ? 'text-gray-400 cursor-not-allowed'
                   : 'text-gray-600 hover:text-gray-900'
               }`}
             >
               <Smartphone className="w-4 h-4" />
               Phone
+              {phoneProviderDisabled && (
+                <AlertCircle className="w-3 h-3 text-red-400" />
+              )}
             </button>
+          </div>
+        )}
+
+        {/* Phone Provider Disabled Warning */}
+        {phoneProviderDisabled && (
+          <div className="bg-amber-50 border border-amber-200 text-amber-800 px-4 py-3 rounded-lg relative" role="alert">
+            <div className="flex items-center">
+              <AlertCircle className="w-4 h-4 mr-2 flex-shrink-0" />
+              <span className="text-sm">
+                Phone authentication is currently unavailable. Please use email login.
+              </span>
+            </div>
           </div>
         )}
 
@@ -451,7 +498,7 @@ const Login: React.FC = () => {
         )}
 
         {/* Phone Form */}
-        {authMode === 'phone' && (
+        {authMode === 'phone' && !phoneProviderDisabled && (
           <form className="mt-8 space-y-6" onSubmit={handlePhoneSubmit}>
             <div className="space-y-4">
               {!otpSent ? (
@@ -530,7 +577,7 @@ const Login: React.FC = () => {
           <h4 className="text-sm font-medium text-blue-800 mb-2">Setup Instructions:</h4>
           <ul className="text-xs text-blue-700 space-y-1">
             <li>• <strong>Google Login:</strong> Enable Google OAuth in Supabase Dashboard → Authentication → Providers</li>
-            <li>• <strong>SMS OTP:</strong> Configure SMS provider in Supabase Dashboard → Authentication → Settings</li>
+            <li>• <strong>SMS OTP:</strong> Configure SMS provider (Twilio/MessageBird) in Supabase Dashboard → Authentication → Settings</li>
             <li>• <strong>Email Confirmation:</strong> Disable in Supabase Dashboard → Authentication → Settings for immediate login</li>
             <li>• Contact support if you need help with configuration</li>
           </ul>
